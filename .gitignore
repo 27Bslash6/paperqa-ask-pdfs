@@ -1,2 +1,5 @@
 docs/
+!docs/_default/.gitkeep
 data/
+myenv/
+.langchain.db
