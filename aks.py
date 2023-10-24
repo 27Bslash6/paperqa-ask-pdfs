@@ -1,4 +1,3 @@
-import os
 import click
 import hashlib
 import joblib
@@ -16,6 +15,7 @@ from paperqa import Docs, PromptCollection
 from langchain.globals import set_llm_cache
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
 
 class Aks:
     def __init__(self, context, question, docs_dir, model, clean):
@@ -40,9 +40,8 @@ class Aks:
 
         self.prompt_template = PromptTemplate(
             input_variables=["context", "question"],
-            template="""Answer the question '{question}' with the following context:
-            Context: {context}.
-            If no references to the indexed materials can be found, do not answer the question.  Format your responses in Markdown.
+            template="""Answer the question '{question}' with the following context: {context}.
+            If no references to the indexed materials can be found, do not answer the question.
             """,
         )
 
@@ -50,7 +49,9 @@ class Aks:
 
         my_llm = ChatOpenAI(model=model)
 
-        self.docs = Docs(prompts=PromptCollection(qa=self.prompt_template), llm=my_llm, memory=True)
+        self.docs = Docs(
+            prompts=PromptCollection(qa=self.prompt_template), llm=my_llm, memory=True
+        )
 
         if self.hashes_match():
             self.load_docs()
@@ -58,7 +59,11 @@ class Aks:
             self.process_docs()
 
     def answer(self):
-        answer = self.docs.query(self.context + "\n\n" + self.question, length_prompt="up to 200 words", max_sources=settings.MAX_SOURCES)
+        answer = self.docs.query(
+            self.context + "\n\n" + self.question,
+            length_prompt="up to 200 words",
+            max_sources=settings.MAX_SOURCES,
+        )
 
         if answer.formatted_answer:
             click.echo(answer.formatted_answer)
@@ -118,7 +123,11 @@ class Aks:
 
     def get_filepaths(self, allowed_file_types=settings.ALLOWED_FILE_TYPES):
         try:
-            files = [path for i in allowed_file_types for path in self.docs_dir.rglob(f"*.{i}")]
+            files = [
+                path
+                for i in allowed_file_types
+                for path in self.docs_dir.rglob(f"*.{i}")
+            ]
             if not files:
                 print(f"No files found in directory: {self.docs_dir}")
 
@@ -130,12 +139,24 @@ class Aks:
 
 
 @click.command()
-@click.option('--dir', '-d', "docs_dir", default="", help='Directory containing documents to index')
-@click.option('--context', '-c', default=settings.DEFAULT_CONTEXT, help='Context to use')
-@click.option('--question', '-q', default=None, help='Question to answer')
-@click.option('--interactive', '-i', default=False, is_flag=True, help='Interactive mode')
-@click.option('--model', '-m', default="gpt-3.5-turbo", help='Model to use')
-@click.option('--clean-cache', "clean", default=False, is_flag=True, help='Clean the cache')
+@click.option(
+    "--dir",
+    "-d",
+    "docs_dir",
+    default="",
+    help="Directory containing documents to index",
+)
+@click.option(
+    "--context", "-c", default=settings.DEFAULT_CONTEXT, help="Context to use"
+)
+@click.option("--question", "-q", default=None, help="Question to answer")
+@click.option(
+    "--interactive", "-i", default=False, is_flag=True, help="Interactive mode"
+)
+@click.option("--model", "-m", default="gpt-3.5-turbo", help="Model to use")
+@click.option(
+    "--clean-cache", "clean", default=False, is_flag=True, help="Clean the cache"
+)
 def aks_me(context, question, docs_dir, interactive, model, clean):
     history = FileHistory(settings.PROMPT_HISTORY_FILE)
     session = PromptSession(history=history)
@@ -147,11 +168,11 @@ def aks_me(context, question, docs_dir, interactive, model, clean):
         while True:
             # Check if both context and question are None
             if context is None:
-                context = session.prompt('Context   : ')
+                context = session.prompt("Context   : ")
 
             if question is None:
                 # Prompt for context and question
-                question = session.prompt('Question : ')
+                question = session.prompt("Question : ")
 
             answer_question = Aks(context, question, docs_dir, model, clean)
             answer_question.answer()
@@ -167,5 +188,6 @@ def aks_me(context, question, docs_dir, interactive, model, clean):
     except KeyboardInterrupt:
         sys.exit(0)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     aks_me()
