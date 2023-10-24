@@ -1,5 +1,11 @@
+credentials/
 docs/
 !docs/_default/.gitkeep
 data/
 myenv/
+dist/
+*.spec
 .langchain.db
+.history.txt
+__pycache__
+build/

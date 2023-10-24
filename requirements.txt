@@ -1,2 +1,10 @@
 paper-qa
+pydantic
+joblib
 click
+prompt_toolkit
+pymupdf
+tqdm
+redis[hiredis]
+cachetools
+upstash_redis

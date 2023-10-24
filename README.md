@@ -1,47 +1,47 @@
-# Ask your PDFS with Paper-QA
+# A Knowledgable System
 
-This script is designed to answer a user's question based on a given context. It utilizes the `paperqa` library, along with other dependencies, to generate an answer using a language model.
+This is a lightweight CLI wrapper around [paper-qa](https://github.com/whitead/paper-qa) for answering questions of your local documents directory.
 
-## Usage
+## Quickstart
 
-1. Make sure you have the required dependencies installed by running `pip install -r requirements.txt`.
-2. Run the script with the following command: `python answer_question.py --context "Enter the context" --question "Enter the question"`.
-3. Provide the required input when prompted.
-4. The script will generate an answer based on the provided context and question and display it.
+1. **Installation**: Clone the repository and navigate to the project directory.
+2. **Environment Setup**: Create and activate a virtual environment (recommended) using your preferred method.
+3. **Dependencies**: Install the required dependencies by running `pip install -r requirements.txt`.
+4. **Indexing Documents**: Prepare the documents you want to index in a directory. Supported file types include `.md`, `.txt`, `.pdf`, `.doc`, and `.docx`.
+5. **Run the Application**: Execute `python aks.py` with the relevant command-line options.
 
-## Dependencies
+## Features
 
-This script relies on the following dependencies:
+### Indexing Documents
+The application allows you to index a directory containing documents. During the indexing process, the application generates hashes for the files to detect changes and updates in the documents. The indexed documents are stored for faster retrieval and processing.
 
-- `click`: Used for command-line interface.
-- `joblib`: Used for object serialization.
-- `paperqa`: Dependency for handling document parsing and querying. See [paperqa](https://github.com/whitead/paper-qa#install)
-- `langchain`: Language model library for generating answers.
-- `langchain.cache`: In-memory cache for language model prompts.
-- `langchain.chat_models`: Library for interacting with language models.
-- `langchain.callbacks.streaming_stdout`: Callback handler for streaming output.
-- `langchain.prompts`: Template for generating prompts.
-- 
+The application expects a `docs` directory to exist if not using the `-d` flag. The `docs` directory is ignored by git.  You can add subdirectories freely under this folder and query them individually using the `-d` flag, or query the entire directory without the flag. The application will recursively search the directory for supported file types.
 
-## Functionality
+### Answering Questions
+Using the indexed documents, you can ask questions and receive answers based on the provided context. The application prompts you to enter the context and question, and it leverages the GPT-3.5-turbo model to generate answers. The answer is displayed in Markdown formatting for easy readability.
 
-1. The script prompts the user to enter the context and the question.
-2. It creates a prompt template based on the provided context and question.
-3. It initializes a language model and sets up prompt handling and callbacks.
-4. It checks for saved documents in a specified directory.
-5. If no saved documents are found, it prompts the user to provide documents and saves them for future use.
-6. If saved documents exist, it loads them.
-7. The script queries the documents with the given context and question.
-8. It generates an answer based on the query and displays it.
+### Interactive Mode
+The application includes an interactive mode, which allows you to ask multiple questions in succession without restarting the application. Once a question is answered, you can enter another question without providing the context again.
 
-## Data Persistence
+### Caching
+To optimize performance, the application employs caching. It stores the indexed documents and their corresponding hashes to quickly determine if any changes have occurred. This helps reduce processing time by avoiding unnecessary reindexing.
 
-The script utilizes the `joblib` library to save and load the document object for future use. The saved document object is stored in the `obj.joblib` file.
+### Cleaning the Cache
+If required, the cache can be cleaned by supplying the --clean-cache flag when executing the application. This removes the saved hashes and the indexed document files to initiate a fresh indexing process.
 
-Note: Make sure to have write permissions in the directory where the script is executed to store the document object.
+Note: It's important to be cautious when using the --clean-cache option, as it erases previously indexed documents and may result in longer processing times for subsequent runs.
 
-## License
+## Example Usage:
 
-This script is licensed under the [MIT License](LICENSE).
+```bash
+python ask.py --dir /path/to/documents --context "Introduction to Python. Answer using Markdown" --question "What is a Python decorator?"
+```
 
-Please check the individual licenses of the dependencies mentioned above before using this script in a commercial product.
+This command recurses any the documents located under the specified directory (/path/to/documents), sets the provided context (Introduction to Python), and asks the provided question (What is a Python decorator?). The application generates the answer using the indexed documents and displays it in Markdown format.
+
+Feel free to explore additional options and functionalities of the application, including the interactive mode and customization options such as the choice of model to use.
+
+```bash
+# Halp
+python ask.py -h
+```
