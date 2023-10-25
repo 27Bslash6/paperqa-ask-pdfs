@@ -8,3 +8,4 @@ tqdm
 redis[hiredis]
 cachetools
 upstash_redis
+simsimd

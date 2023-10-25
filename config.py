@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     You are an expert advisor with deep industry knowledge of the indexed content.
     """
     )
+    DEFAULT_LENGTH_PROMPT: str = Field(
+        default="up to 250 words", env="DEFAULT_LENGTH_PROMPT"
+    )
     MAX_INDEXER_THREADS: int = Field(default=4, env="MAX_INDEXER_THREADS")
     MAX_SOURCES: int = Field(default=10, env="MAX_SOURCES")
     WORKING_DIR: Path = Field(default=Path(os.getcwd()), env="WORKING_DIR")
@@ -25,7 +28,7 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_settings_singleton() -> Settings:
     return Settings()
 
@@ -47,7 +50,7 @@ class CredentialsFactory:
         raise ValueError(f"Unknown credentials type: {type}")
 
 
-@ttl_cache(60)
+@ttl_cache(300)
 def get_credentials_singleton(type: str) -> Credentials:
     """
     Cached credentials lookups
