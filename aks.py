@@ -1,18 +1,20 @@
-import logging
+from functools import cache
+from os import makedirs
 import click
 from hashlib import md5
 from joblib import dump, load
 from sys import exit
 from logger import logger
-from logging import DEBUG, INFO
+from logging import DEBUG
 
-from config import settings
+from config import settings, dirs
 from cache import get_cache
 from tqdm import tqdm
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 from paperqa import Docs, PromptCollection
 from langchain.globals import set_llm_cache
@@ -25,23 +27,39 @@ class Aks:
     def __init__(self, context: str, docs_dir: str, model: str, clean: bool):
         self.context: str = context
         self.docs_dir: Path = settings.DOCS_BASE_PATH / docs_dir
-        self.data_file: Path = self.docs_dir / settings.DATA_FILE_NAME
-        self.hashes_file: Path = self.docs_dir / settings.HASHES_FILE_NAME
+        self.data_dir: Path = Path(dirs.user_data_dir) / self.get_md5(self.docs_dir)
+        self.data_file: Path = self.data_dir / settings.DATA_FILE_NAME
+        self.cache_file: Path = (
+            Path(dirs.user_cache_dir)
+            / self.get_md5(self.docs_dir)
+            / settings.CACHE_FILE_NAME
+        )
+
+        self.hashes_file: Path = Path(dirs.user_cache_dir) / settings.HASHES_FILE_NAME
 
         self.hash_dict = {}
 
-        if not self.docs_dir.exists():
-            click.echo(f"Directory '{docs_dir}' does not exist.")
-            exit(1)  # or however you want to handle this error
-
-        if not self.data_file.exists() or not self.hashes_file.exists():
-            clean = True  # force cleaning if the data or hash file does not exist
+        logger.debug("Data dir: %s", self.data_dir)
 
         if clean:
+            logger.debug("Cleaning cache.")
             # If 'clean' is True, always remove and regenerate the data and hashes files
-            for file in [self.hashes_file, self.data_file]:
-                if file.exists():
-                    file.unlink()
+            for dir in [self.data_dir, self.cache_dir]:
+                if dir.exists():
+                    dir.unlink()
+
+        if not self.data_file.parent.exists():
+            makedirs(self.data_file.parent, exist_ok=True)
+
+        if not self.hashes_file.parent.exists():
+            makedirs(self.hashes_file.parent, exist_ok=True)
+
+        if not self.cache_file.parent.exists():
+            makedirs(self.cache_file.parent, exist_ok=True)
+
+        if not self.docs_dir.exists():
+            click.echo(f"Directory '{docs_dir}' does not exist.")
+            raise click.Abort()
 
         self.prompt_template = PromptTemplate(
             input_variables=["context", "question"],
@@ -50,7 +68,7 @@ class Aks:
             """,
         )
 
-        set_llm_cache(get_cache())
+        set_llm_cache(get_cache(self.cache_file))
 
         my_llm = ChatOpenAI(model=model)
 
@@ -86,39 +104,56 @@ class Aks:
             return False
 
         saved_hashes = self.load_saved_hashes()
-        current_hashes = self.calculate_hashes(self.get_filepaths())
+        self.calculate_hashes(self.get_filepaths())
 
-        return saved_hashes == current_hashes
+        print(saved_hashes)
+        print(self.hash_dict)
+
+        for key, value in self.hash_dict.items():
+            if saved_hashes.get(key) != value:
+                return False
+
+        return True
 
     def load_saved_hashes(self):
-        logger.debug("Loading saved hashes from %s", str(self.hashes_file))
-        with self.hashes_file.open("r") as file:
-            return file.read().splitlines()
+        return load(self.hashes_file)
 
     def calculate_hashes(self, files: list) -> list:
         logger.debug("Calculating hashes.")
         with ThreadPoolExecutor() as executor:
             return list(executor.map(self.calculate_file_hash, files))
 
-    def calculate_file_hash(self, file: Path) -> str:
-        logger.debug("Calculating file hash for %s", str(file))
+    # @cache
+    # def get_relative_filename(self, filename: str) -> str:
+    #     return filename.replace(str(self.docs_dir), "")
+
+    @cache
+    def get_md5(self, string: str) -> str:
         hash_md5 = md5(usedforsecurity=False)
+        hash_md5.update(str(string).encode("utf-8"))
+        return hash_md5.hexdigest()
+
+    @cache
+    def calculate_file_hash(self, file: Path) -> str:
+        filename = file.as_posix()
         with file.open("rb") as f:
-            hash_md5.update(f.read())
-        self.hash_dict[file] = hash_md5.hexdigest()
-        logger.debug("Hash for %s is %s", str(file), self.hash_dict[file])
-        return self.hash_dict[file]
+            self.hash_dict[filename] = self.get_md5(f.read())
+        logger.debug(
+            "Hash: %s = %s",
+            filename,
+            self.hash_dict[filename],
+        )
+        return self.hash_dict[filename]
 
     def process_docs(self):
         logger.info("Indexing documents in directory %s ...", self.docs_dir)
-        file_hashes = self.calculate_hashes(self.get_filepaths())
-        self.save_hashes(file_hashes)
+        self.calculate_hashes(self.get_filepaths())
+        self.save_hashes()
         self.add_docs_and_save()
 
-    def save_hashes(self, hashes: list):
+    def save_hashes(self):
         logger.debug("Saving hashes to %s ...", str(self.hashes_file))
-        with self.hashes_file.open("w") as file:
-            file.write("\n".join(hashes))
+        dump(self.hash_dict, self.hashes_file)
 
     def add_docs_and_save(self):
         self.add_docs(self.get_filepaths())
@@ -128,7 +163,11 @@ class Aks:
         logger.debug("Adding documents.")
         with ThreadPoolExecutor(max_workers=settings.MAX_INDEXER_THREADS) as executor:
             futures = [
-                executor.submit(self.docs.add, str(file), docname=self.hash_dict[file])
+                executor.submit(
+                    self.docs.add,
+                    str(file),
+                    docname=self.hash_dict[file.as_posix()],
+                )
                 for file in files
             ]
 

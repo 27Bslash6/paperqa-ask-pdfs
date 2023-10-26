@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Union
 from functools import cache
 from upstash_redis import Redis
@@ -28,8 +29,9 @@ class RedisCredentials(Credentials):
 
 
 @cache
-def get_cache(override_type: str = None) -> Union[SQLiteCache, UpstashRedisCache]:
-    cache_type = override_type or settings.CACHE_TYPE
+def get_cache(
+    path: Path = Path(".ask.cache"), cache_type: str = settings.CACHE_TYPE
+) -> Union[SQLiteCache, UpstashRedisCache]:
     if cache_type == "redis":
         logger.debug("Using Redis cache.")
         redis_credentials = get_credentials_singleton("redis")
@@ -38,6 +40,9 @@ def get_cache(override_type: str = None) -> Union[SQLiteCache, UpstashRedisCache
             token=redis_credentials.TOKEN.get_secret_value(),
         )
         return UpstashRedisCache(redis)
-    else:
+
+    if cache_type == "sqlite":
         logger.debug("Using SQLite cache.")
-        return SQLiteCache()
+        return SQLiteCache(path)
+
+    return None
